@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace RewiredIMGUIBlocker
 {
@@ -9,9 +10,12 @@ namespace RewiredIMGUIBlocker
     public class Plugin : BaseUnityPlugin
     {
         const string REWIRED_ASSEMBLY_NAME = "Rewired_Core";
+        const string CONFIG_MANAGER_ASSEMBLY_NAME = "ConfigurationManager";
 
         static bool hasRewired = false;
         static bool shouldReenableKeyboard = false;
+
+        private GameObject _clickBlockerCanvas;
 
         void Awake()
         {
@@ -22,7 +26,36 @@ namespace RewiredIMGUIBlocker
             hasRewired = rewiredAssembly != null;
 
             if (hasRewired) Logger.LogInfo("Rewired found.");
-            else Logger.LogWarning("Rewired NOT found. Going to sleep.");
+            else Logger.LogWarning("Rewired NOT found.");
+
+        }
+
+        void Start() {
+            var configManagerAssembly = AppDomain.CurrentDomain
+                .GetAssemblies()
+                .SingleOrDefault(assembly => assembly.GetName().Name.Equals(CONFIG_MANAGER_ASSEMBLY_NAME, StringComparison.OrdinalIgnoreCase));
+
+            if (configManagerAssembly == null)
+            {
+                Logger.LogInfo("BepInEx.ConfigurationManager is not loaded. Not blocking mouse input behind it.");
+                return;
+            }
+
+            SetupClickBlocker();
+        }
+
+        void SetupClickBlocker()
+        {
+            var configManager = FindObjectOfType<ConfigurationManager.ConfigurationManager>();
+
+            if (configManager == null)
+            {
+                Logger.LogInfo("No instance of BepInEx.ConfigurationManager found. Not blocking mouse input behind it.");
+                return;
+            }
+
+            Logger.LogInfo("Found BepInEx.ConfigurationManager. Setting up mouse input block when opened.");
+            configManager.DisplayingWindowChanged += (_, displayWindow) => BlockClicks(displayWindow.NewValue);
         }
 
         void OnGUI()
@@ -48,6 +81,30 @@ namespace RewiredIMGUIBlocker
             {
                 keyboard.enabled = true;
                 shouldReenableKeyboard = false;
+            }
+        }
+
+        private void BlockClicks(bool block)
+        {
+            if (block)
+            {
+                _clickBlockerCanvas = new GameObject("Rewired Click Blocker", typeof(Canvas), typeof(GraphicRaycaster));
+                var canvas = _clickBlockerCanvas.GetComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.sortingOrder = Int16.MaxValue;
+                DontDestroyOnLoad(_clickBlockerCanvas);
+                var panel = new GameObject("Image", typeof(Image));
+                panel.transform.SetParent(_clickBlockerCanvas.transform);
+                var rect = panel.GetComponent<RectTransform>();
+                rect.anchorMin = new Vector2(0, 0);
+                rect.anchorMax = new Vector2(1, 1);
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+                panel.GetComponent<Image>().color = new Color(0, 0, 0, 0.3f);
+            }
+            else if (_clickBlockerCanvas)
+            {
+                Destroy(_clickBlockerCanvas);
             }
         }
     }
