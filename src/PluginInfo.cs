@@ -1,5 +1,5 @@
 ﻿using System.Reflection;
-using BepInExPlugin;
+using RewiredIMGUIBlocker;
 
 #region Assembly attributes
 /*
