@@ -30,7 +30,8 @@ namespace RewiredIMGUIBlocker
 
         }
 
-        void Start() {
+        void Start()
+        {
             var configManagerAssembly = AppDomain.CurrentDomain
                 .GetAssemblies()
                 .SingleOrDefault(assembly => assembly.GetName().Name.Equals(CONFIG_MANAGER_ASSEMBLY_NAME, StringComparison.OrdinalIgnoreCase));
@@ -55,23 +56,30 @@ namespace RewiredIMGUIBlocker
             }
 
             Logger.LogInfo("Found BepInEx.ConfigurationManager. Setting up mouse input block when opened.");
-            configManager.DisplayingWindowChanged += (_, displayWindow) => BlockClicks(displayWindow.NewValue);
+            configManager.DisplayingWindowChanged += (_, displayWindow) =>
+            {
+                BlockClicks(displayWindow.NewValue);
+                if (hasRewired && !displayWindow.NewValue)
+                {
+                    GUIUtility.keyboardControl = 0;
+                    BlockKeyboard(false);
+                }
+            };
         }
 
         void OnGUI()
         {
             if (!hasRewired) return;
 
-            PerformBlock();
+            BlockKeyboard(GUIUtility.keyboardControl != 0);
         }
 
         // Leave this in a separate method to avoid problems if Rewired is not loaded
-        static void PerformBlock()
+        static void BlockKeyboard(bool block)
         {
-            var canBeEnabled = GUIUtility.keyboardControl == 0;
             var keyboard = Rewired.ReInput.controllers.Keyboard;
 
-            if (keyboard.enabled == canBeEnabled) return;
+            if (keyboard.enabled != block) return;
             if (keyboard.enabled)
             {
                 keyboard.enabled = false;
